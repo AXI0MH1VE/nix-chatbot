@@ -1,0 +1,115 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nix-chatbot-backend
+  labels:
+    app: nix-chatbot
+    component: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nix-chatbot
+      component: backend
+  template:
+    metadata:
+      labels:
+        app: nix-chatbot
+        component: backend
+    spec:
+      containers:
+      - name: backend
+        image: nix-chatbot-backend:latest
+        ports:
+        - containerPort: 3000
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: nix-secrets
+              key: openai-api-key
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nix-chatbot-frontend
+  labels:
+    app: nix-chatbot
+    component: frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nix-chatbot
+      component: frontend
+  template:
+    metadata:
+      labels:
+        app: nix-chatbot
+        component: frontend
+    spec:
+      containers:
+      - name: frontend
+        image: nix-chatbot-frontend:latest
+        ports:
+        - containerPort: 80
+        env:
+        - name: REACT_APP_API_URL
+          value: "http://nix-chatbot-backend-service:3000"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "250m"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nix-chatbot-backend-service
+  labels:
+    app: nix-chatbot
+    component: backend
+spec:
+  type: ClusterIP
+  ports:
+  - port: 3000
+    targetPort: 3000
+  selector:
+    app: nix-chatbot
+    component: backend
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nix-chatbot-frontend-service
+  labels:
+    app: nix-chatbot
+    component: frontend
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 80
+  selector:
+    app: nix-chatbot
+    component: frontend
